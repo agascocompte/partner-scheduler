@@ -90,16 +90,25 @@ export default function App() {
     downloadICS(buildICS(shifts, includeFreeDays), icsFilename());
   }
 
-  async function onApple() {
+  function isIOS(): boolean {
+    return (
+      /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+      // iPadOS reports itself as macOS but has a touch screen
+      (navigator.userAgent.includes("Mac") && "ontouchend" in document)
+    );
+  }
+
+  function onApple() {
     const ics = buildICS(shifts, includeFreeDays);
-    const file = new File([ics], icsFilename(), { type: "text/calendar" });
-    if (navigator.canShare?.({ files: [file] })) {
-      try {
-        await navigator.share({ files: [file], title: "Horario" });
-        return;
-      } catch {
-        // user cancelled the share sheet — fall through to download
-      }
+    if (isIOS()) {
+      // Navigating to the .ics (instead of downloading it) makes Safari show
+      // its native calendar preview with the "Add All" button. The Calendar
+      // app is not a share-sheet target, so navigator.share doesn't work here.
+      const blob = new Blob([ics], { type: "text/calendar;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      window.location.assign(url);
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      return;
     }
     downloadICS(ics, icsFilename());
   }
@@ -297,9 +306,10 @@ export default function App() {
                 duplican).
               </li>
               <li>
-                <strong>Apple Calendar (iPhone):</strong> se abre la hoja de compartir;
-                elige «Calendario» o guarda el archivo y ábrelo para pulsar «Añadir
-                todos».
+                <strong>Apple Calendar (iPhone):</strong> se abre una vista previa de los
+                eventos en Safari; pulsa «Añadir todo». Si en su lugar se descarga un
+                archivo, tócalo en Descargas (flecha azul arriba a la derecha) y pulsa
+                «Añadir todo».
               </li>
               <li>
                 <strong>Archivo .ics:</strong> descarga manual, se puede importar en{" "}

@@ -16,7 +16,7 @@ calendario del móvil:
 | Horario | Título del evento |
 |---|---|
 | 07:00 – 15:00 | Mañana |
-| 13:00 – 21:00 o 13:30 – 21:30 | Noche |
+| 13:00 – 21:00 o 13:30 – 21:30 | Tarde |
 | Cualquier otro | Partido |
 
 ## Requisitos

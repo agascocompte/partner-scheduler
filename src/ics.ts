@@ -37,12 +37,12 @@ export function nextDay(date: string): string {
   return d.toISOString().slice(0, 10);
 }
 
-export type ShiftName = "Mañana" | "Noche" | "Partido";
+export type ShiftName = "Mañana" | "Tarde" | "Partido";
 
 export function shiftName(start: string, end: string): ShiftName {
   if (start === "07:00" && end === "15:00") return "Mañana";
-  if (start === "13:00" && end === "21:00") return "Noche";
-  if (start === "13:30" && end === "21:30") return "Noche";
+  if (start === "13:00" && end === "21:00") return "Tarde";
+  if (start === "13:30" && end === "21:30") return "Tarde";
   return "Partido";
 }
 
