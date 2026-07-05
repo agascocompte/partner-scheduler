@@ -105,6 +105,14 @@ button.primary:disabled {
   cursor: not-allowed;
 }
 
+button.primary.google {
+  background: #1a73e8;
+}
+
+button.primary.apple {
+  background: #1c1c1e;
+}
+
 button.ghost {
   background: none;
   border: 1px solid #ccc;
@@ -112,6 +120,19 @@ button.ghost {
   padding: 0.3rem 0.6rem;
   cursor: pointer;
   color: #555;
+}
+
+button.ghost.block {
+  display: block;
+  width: 100%;
+  margin-top: 0.75rem;
+  padding: 0.6rem;
+}
+
+.hint {
+  display: block;
+  color: #777;
+  margin-top: 0.25rem;
 }
 
 .error {

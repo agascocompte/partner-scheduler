@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { extractShifts, fileToResizedBase64 } from "./extract";
-import { buildICS, downloadICS } from "./ics";
+import { buildICS, downloadICS, shiftName } from "./ics";
+import { addShiftsToGoogle } from "./google";
 import type { Shift } from "./types";
 import "./App.css";
 
@@ -14,6 +15,11 @@ function weekday(date: string): string {
 export default function App() {
   const [apiKey, setApiKey] = useState(() => localStorage.getItem("anthropic_api_key") ?? "");
   const [person, setPerson] = useState(() => localStorage.getItem("person_name") ?? "Marta J");
+  const [googleClientId, setGoogleClientId] = useState(
+    () => localStorage.getItem("google_client_id") ?? "",
+  );
+  const [googleBusy, setGoogleBusy] = useState(false);
+  const [googleMsg, setGoogleMsg] = useState<string | null>(null);
   const [year, setYear] = useState(() => new Date().getFullYear());
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
@@ -28,6 +34,9 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem("person_name", person);
   }, [person]);
+  useEffect(() => {
+    localStorage.setItem("google_client_id", googleClientId);
+  }, [googleClientId]);
 
   function onFileChange(f: File | null) {
     setFile(f);
@@ -72,10 +81,42 @@ export default function App() {
     ]);
   }
 
-  function onDownload() {
-    const ics = buildICS(shifts, person, includeFreeDays);
+  function icsFilename(): string {
     const first = shifts[0]?.date ?? "horario";
-    downloadICS(ics, `horario-${person.replaceAll(" ", "_")}-${first}.ics`);
+    return `horario-${person.replaceAll(" ", "_")}-${first}.ics`;
+  }
+
+  function onDownload() {
+    downloadICS(buildICS(shifts, includeFreeDays), icsFilename());
+  }
+
+  async function onApple() {
+    const ics = buildICS(shifts, includeFreeDays);
+    const file = new File([ics], icsFilename(), { type: "text/calendar" });
+    if (navigator.canShare?.({ files: [file] })) {
+      try {
+        await navigator.share({ files: [file], title: "Horario" });
+        return;
+      } catch {
+        // user cancelled the share sheet — fall through to download
+      }
+    }
+    downloadICS(ics, icsFilename());
+  }
+
+  async function onGoogle() {
+    setGoogleBusy(true);
+    setGoogleMsg(null);
+    try {
+      const r = await addShiftsToGoogle(googleClientId, shifts, includeFreeDays);
+      setGoogleMsg(
+        `✅ Listo: ${r.created} eventos creados y ${r.updated} actualizados en Google Calendar.`,
+      );
+    } catch (e) {
+      setGoogleMsg(`⚠️ ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setGoogleBusy(false);
+    }
   }
 
   const canExtract = Boolean(file && apiKey && !loading);
@@ -124,6 +165,16 @@ export default function App() {
             />
           </label>
         </div>
+        <label>
+          Google Client ID (opcional, para añadir directamente a Google Calendar)
+          <input
+            value={googleClientId}
+            onChange={(e) => setGoogleClientId(e.target.value.trim())}
+            placeholder="xxxxxxxx.apps.googleusercontent.com"
+            autoComplete="off"
+          />
+          <small>Ver el README del repositorio para crearlo (5 minutos, gratis).</small>
+        </label>
       </section>
 
       <section className="card">
@@ -156,6 +207,7 @@ export default function App() {
                 <th>Libre</th>
                 <th>Inicio</th>
                 <th>Fin</th>
+                <th>Turno</th>
                 <th></th>
               </tr>
             </thead>
@@ -193,6 +245,7 @@ export default function App() {
                       onChange={(e) => updateShift(i, { end: e.target.value })}
                     />
                   </td>
+                  <td>{s.free ? "Libre" : shiftName(s.start, s.end)}</td>
                   <td>
                     <button className="ghost" onClick={() => removeShift(i)} title="Eliminar">
                       ✕
@@ -206,7 +259,7 @@ export default function App() {
             + Añadir día
           </button>
 
-          <h2>4. Exportar</h2>
+          <h2>4. Añadir al calendario</h2>
           <label className="inline">
             <input
               type="checkbox"
@@ -215,27 +268,49 @@ export default function App() {
             />
             Incluir días libres como eventos de día completo
           </label>
-          <button className="primary" onClick={onDownload}>
-            ⬇️ Descargar .ics
+          <button
+            className="primary google"
+            disabled={!googleClientId || googleBusy}
+            onClick={onGoogle}
+          >
+            {googleBusy ? "Añadiendo…" : "📆 Añadir a Google Calendar"}
+          </button>
+          {!googleClientId && (
+            <small className="hint">
+              Para el botón de Google, configura el Google Client ID en el paso 1.
+            </small>
+          )}
+          {googleMsg && <p className={googleMsg.startsWith("✅") ? "" : "error"}>{googleMsg}</p>}
+          <button className="primary apple" onClick={onApple}>
+             Añadir a Apple Calendar
+          </button>
+          <button className="ghost block" onClick={onDownload}>
+            ⬇️ Descargar archivo .ics
           </button>
           <details>
-            <summary>¿Cómo lo añado al calendario?</summary>
+            <summary>¿Cómo funciona cada opción?</summary>
             <ul>
               <li>
-                <strong>iPhone / Apple Calendar:</strong> abre el archivo .ics descargado y
-                pulsa «Añadir todos».
+                <strong>Google Calendar:</strong> se abre una ventana de Google para dar
+                permiso una vez y los turnos se añaden directamente al calendario. Si
+                envías la misma semana corregida, los eventos se actualizan (no se
+                duplican).
               </li>
               <li>
-                <strong>Google Calendar:</strong> en{" "}
+                <strong>Apple Calendar (iPhone):</strong> se abre la hoja de compartir;
+                elige «Calendario» o guarda el archivo y ábrelo para pulsar «Añadir
+                todos».
+              </li>
+              <li>
+                <strong>Archivo .ics:</strong> descarga manual, se puede importar en{" "}
                 <a
                   href="https://calendar.google.com/calendar/u/0/r/settings/export"
                   target="_blank"
                   rel="noreferrer"
                 >
-                  calendar.google.com → Ajustes → Importar y exportar
-                </a>
-                , selecciona el archivo .ics e impórtalo. Si reimportas la misma semana
-                corregida, los eventos se actualizan (no se duplican).
+                  Google Calendar → Ajustes → Importar
+                </a>{" "}
+                o abrir en cualquier app de calendario.
               </li>
             </ul>
           </details>

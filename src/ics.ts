@@ -31,17 +31,22 @@ function toDt(date: string, time: string): string {
   return `${compact(date)}T${h.padStart(2, "0")}${(m ?? "00").padStart(2, "0")}00`;
 }
 
-function nextDay(date: string): string {
+export function nextDay(date: string): string {
   const d = new Date(`${date}T12:00:00`);
   d.setDate(d.getDate() + 1);
   return d.toISOString().slice(0, 10);
 }
 
-export function buildICS(
-  shifts: Shift[],
-  person: string,
-  includeFreeDays: boolean,
-): string {
+export type ShiftName = "Mañana" | "Noche" | "Partido";
+
+export function shiftName(start: string, end: string): ShiftName {
+  if (start === "07:00" && end === "15:00") return "Mañana";
+  if (start === "13:00" && end === "21:00") return "Noche";
+  if (start === "13:30" && end === "21:30") return "Noche";
+  return "Partido";
+}
+
+export function buildICS(shifts: Shift[], includeFreeDays: boolean): string {
   const now = new Date()
     .toISOString()
     .replace(/[-:]/g, "")
@@ -60,7 +65,7 @@ export function buildICS(
           `DTSTAMP:${now}`,
           `DTSTART;VALUE=DATE:${compact(s.date)}`,
           `DTEND;VALUE=DATE:${compact(nextDay(s.date))}`,
-          `SUMMARY:Libre (${person})`,
+          "SUMMARY:Libre",
           "TRANSP:TRANSPARENT",
           "END:VEVENT",
         ].join("\r\n"),
@@ -77,7 +82,7 @@ export function buildICS(
         `DTSTAMP:${now}`,
         `DTSTART;TZID=${TZID}:${toDt(s.date, s.start)}`,
         `DTEND;TZID=${TZID}:${toDt(endDate, s.end)}`,
-        `SUMMARY:Trabajo ${person} (${s.start}-${s.end})`,
+        `SUMMARY:${shiftName(s.start, s.end)}`,
         "END:VEVENT",
       ].join("\r\n"),
     );
