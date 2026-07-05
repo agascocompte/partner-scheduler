@@ -7,8 +7,8 @@ const CALENDAR_API = "https://www.googleapis.com/calendar/v3/calendars/primary/e
 // Google Calendar color ids: 5 = amarillo, 6 = naranja, 11 = rojo
 const SHIFT_COLOR: Record<string, string> = {
   "Mañana": "5",
-  "Tarde": "6",
-  "Partido": "11",
+  "Tarde": "11",
+  "Partido": "6",
 };
 
 interface TokenResponse {
